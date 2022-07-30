@@ -13,7 +13,7 @@
 ### QUERIES
 [] Main directory databases
 
-### getDatabaseStructure
+### getDatabaseStructureObject
 [X] Query database properties
 [X] Stract name, type, option || relation
 [] Structure into arrays to Excel convertion  
