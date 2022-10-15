@@ -1,7 +1,10 @@
 const { Client } = require('@notionhq/client');
-const XLSX = require("xlsx");
+
 const { arrayToExcel } = require('./modelToExcel');
+
 const notion = new Client({ auth: 'secret_3eEi2GSB2eE7oV1HDwuBSHqTGH7Dj7CzCWehqLxoiLh' });
+
+
 
 async function getDatabaseModel(databasesId) {
   const modelStructeredToSaveXLSX = await getDatabaseStructureObject(databasesId)
@@ -42,10 +45,22 @@ async function getDatabaseStructureObject(databaseId) {
 }
 
 function formatDatabaseStructToArray(databaseStructureObject) { 
+  // console.log(databaseStructureObject);
   let mainPropsStructureArray = [ // PROP NAME AND TYPE
     ["name", "type"],
     ...databaseStructureObject.map( prop => [prop.name, prop.type] )
   ]
+
+  // MAP OTHER PROPS
+  databaseStructureObject.forEach( prop => {
+    if(prop.options) {
+      mainPropsStructureArray.push(["-","-"]);
+      mainPropsStructureArray.push([prop.name, prop.type]);
+      mainPropsStructureArray.push(...prop.options);
+    }
+  } )
+
+  console.log(mainPropsStructureArray);
 
   return mainPropsStructureArray
 }
@@ -60,31 +75,25 @@ async function getDatabaseData( databaseId ) {
   return response;
 }
 
-function createDatabaseGuideInExcel( databaseId, workbookName ) {
-  getDatabaseData(databaseId)
-  .then( ({results}) => arrayToExcel(databaseElementsNameAndIdAOA(results), workbookName ));
-
-  console.log("Guide done");
-}
-
 function databaseElementsNameAndIdAOA ( databaseResults ) {
   const nameAndIdArray = [
     ["ID", "Title"],
     ...databaseResults.map( page => {
-      return [ page.id, page.properties.Name.title[0].plain_text]
+      return [ page.id, getPageTitle(page)]
     } )
   ]
 
   return nameAndIdArray;
 }
+
 // ============================================================
 
 // END MODELING EXTRACTION ------------------------------------------------------
 
 // GETTING NTS REPORTS INTO EXCEL
 
-async function servicesListToArray(databaseResults) {
-  console.log(databaseResults.map( res => res.properties['Created at']))
+async function idPropsToArray(databaseResults) {
+  // console.log(databaseResults.map( res => res.properties['Created at']))
 
   const sheetArray = [
     [ "Page URL", "Ticket Nº", "Assunto", "Status", "Categoria", "Setor", "url", "Ultima visualização", "Criado em", "Atribuido para", ],
@@ -123,79 +132,73 @@ async function servicesListToArray(databaseResults) {
   return sheetArray
 }
 
-async function getOSsRelation(){
-  const databaseId = 'bf733aac73d9415eb116c47f1a9815ed';
+async function getDomainControllersList() {
+  const tasksDomainControllersFilter = {
+    property: 'Item category',
+    select: {
+      equals: 'Domain controller',
+    },
+  }
+  const tasksDatabaseId = 'f1abd3b9a124474aa43c5a6478ce9057';
+
+  let tasksDomainControllers = await getPagesList(tasksDatabaseId, tasksDomainControllersFilter);
+  let tasksDomainControllersMeta = tasksDomainControllers.map(getRelationsData);
+
+  console.log(tasksDomainControllersMeta);
+
+  return(tasksDomainControllersMeta);
+}
+
+/**
+ * Get all pages from database query
+ * */ 
+ async function getPagesList(databaseId, notionApiFilter){
   let queryResult = await notion.databases.query({
     database_id: databaseId,
-    filter: {
-      or: [
-        {
-          property: 'Item category',
-          select: {
-            equals: 'OS - eSolution',
-          },
-        },
-        {
-          property: 'Item category',
-          select: {
-            equals: 'OS - Chamado interno',
-          },
-        },
-        {
-          property: 'Item category',
-          select: {
-            equals: 'OS - Faitec',
-          },
-        },
-      ],
-      
-    },
+    filter: notionApiFilter
   })
 
-  let ossList = []
-  if (!queryResult.has_more || ossList.length == 0) 
-    ossList = [...queryResult.results];
+  let notionPagesList = []
+  if (!queryResult.has_more || notionPagesList.length == 0) 
+    notionPagesList = [...queryResult.results];
+    
   if(queryResult.has_more) {
     while ( queryResult.has_more ) {
       await notion.databases.query({
         database_id: databaseId,
-        filter: {
-          or: [
-            {
-              property: 'Item category',
-              select: {
-                equals: 'OS - eSolution',
-              },
-            },
-            {
-              property: 'Item category',
-              select: {
-                equals: 'OS - Chamado interno',
-              },
-            },
-            {
-              property: 'Item category',
-              select: {
-                equals: 'OS - Faitec',
-              },
-            },
-          ],
-          
-        },
+        filter: notionApiFilter,
         start_cursor: queryResult.next_cursor
       }).then( result => {
         queryResult = result;
-        ossList.push(...result.results);
+        notionPagesList.push(...result.results);
       } )
     }
   }
 
-  const ossArray = await servicesListToArray(ossList);
-  
-  arrayToExcel(ossArray, "Reports");
+  return notionPagesList;
+}
+
+
+const getPageTitle = (page) => {
+  return page.properties.Name.title[0].plain_text
+}
+
+const idFromRelation = (relationsArray) => {
+  return [ ...relationsArray.map( each => each.id ) ]
+}
+
+const getRelationsData = ( notionPage ) => {
+  return {
+    id: notionPage.id, 
+    title: getPageTitle(notionPage),
+    subTasks: idFromRelation(notionPage.properties.Subtask.relation),
+    logs: idFromRelation(notionPage.properties.LOGS.relation),
+    resources: idFromRelation(notionPage.properties.Resources.relation),
+  }
 }
 
 module.exports = {
-  getDatabaseStructureObject, createDatabaseGuideInExcel,
-  getOSsRelation, getDatabaseModel
+  getDatabaseStructureObject,
+  getPagesList, getDatabaseModel, databaseElementsNameAndIdAOA,
+  getDomainControllersList
 }

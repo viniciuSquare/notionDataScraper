@@ -1,8 +1,7 @@
-// const { Client } = require("@notionhq/client");
 const XLSX = require('xlsx');
 
-const { getDatabaseModel } = require("./handlers/handleStructure");
-const { getDatabaseStructureObject, formatDatabaseStructToArray, arrayToExcel } = require("./handlers/modelToExcel");
+const { getDatabaseModel, getDomainControllersList } = require("./handlers/handleStructure");
+const { getDatabaseStructureObject, formatDatabaseStructToArray, arrayToExcel, saveDatabasesModelToExcel } = require("./handlers/modelToExcel");
 
 
 const databasesMetadata = [
@@ -55,37 +54,7 @@ const workDatabasesIds = [
   }
 ];
 
-// getOSsRelation();
-async function saveDatabasesModelToExcel(databasesMetadata) {
-  var workbook = XLSX.utils.book_new()
-  const databasesModelAOA = await Promise.all( databasesMetadata
-    .map( (databaseMetadata) => getDatabaseModel(databaseMetadata.id)))
-      // .then(result => console.log(result));
+// saveDatabasesModelToExcel(databasesMetadata);
 
-  console.log(databasesModelAOA);
-  databasesModelAOA.forEach( (databaseModel, idx) => {
-    var worksheet = XLSX.utils.aoa_to_sheet([...databaseModel]);
-  
-    XLSX.utils.book_append_sheet(workbook, worksheet, databasesMetadata[idx].name);
-  } )
 
-  var wopts = { bookType:'xlsx', bookSST:false, type:'binary' };
-  XLSX.writeFileXLSX( workbook, `Models - ${ new Date().getDate() } ${ new Date().getMonth() }.xlsx`, wopts );
-  console.log("Done");
-}
-
-async function saveDatabaseModelToExcel(databaseMetadata) {
-  var workbook = XLSX.utils.book_new()
-
-  const modelToSave = await getDatabaseModel(databaseMetadata.id);
-  var worksheet = XLSX.utils.aoa_to_sheet([...modelToSave]);
-  
-  XLSX.utils.book_append_sheet(workbook, worksheet, databaseMetadata.name);
-
-  var wopts = { bookType:'xlsx', bookSST:false, type:'binary' };
-  XLSX.writeFileXLSX( workbook, `Model - ${ new Date().getDate() } ${ new Date().getMonth() }.xlsx`, wopts );
-  console.log("Done");
-
-}
-
-saveDatabasesModelToExcel(databasesMetadata);
+getDomainControllersList()
